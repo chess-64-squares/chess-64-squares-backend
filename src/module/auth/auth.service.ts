@@ -5,14 +5,18 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
-import { UsersService } from '../user/user.service';
+import { UserService } from '../user/user.service';
 import { RedisService } from '../../redis/redis.service';
+import { MailService } from '../mail/mail.service';
+
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './types/jwt-payload.type';
 import { UserStatus } from '../../common/enum/user-status.enum';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 
 @Injectable()
 export class AuthService {
@@ -20,14 +24,17 @@ export class AuthService {
 
   private readonly JWT_TTL_SECONDS = 7 * 24 * 60 * 60;
 
+  private readonly EMAIL_OTP_TTL_SECONDS = 5 * 60;
+
   constructor(
-    private readonly usersService: UsersService,
+    private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
-  ) {}
+    private readonly mailService: MailService,
+  ) { }
 
   async register(registerDto: RegisterDto) {
-    const existingUser = await this.usersService.findByEmail(registerDto.email);
+    const existingUser = await this.userService.findByEmail(registerDto.email);
 
     if (existingUser) {
       throw new BadRequestException('Email đã được sử dụng');
@@ -35,27 +42,108 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    const user = await this.usersService.create({
+    const user = await this.userService.create({
       email: registerDto.email,
       username: registerDto.username,
       password: hashedPassword,
+      isEmailVerified: false,
     });
 
-    const token = await this.generateToken(user.userId, user.email);
+    const otp = this.generateOtp();
+
+    const redisKey = this.getEmailOtpKey(user.email);
+
+    await this.redisService.set(redisKey, otp, this.EMAIL_OTP_TTL_SECONDS);
+
+    await this.mailService.sendVerifyEmail(user.email, otp);
 
     return {
-      message: 'Đăng kí thành công',
+      message: 'Đăng kí thành công. Vui lòng kiểm tra email để lấy mã OTP',
       user: {
         id: user.userId,
         email: user.email,
         username: user.username,
+        isEmailVerified: user.isEmailVerified,
       },
-      accessToken: token.accessToken,
+    };
+  }
+
+  async verifyEmail(verifyEmailDto: VerifyEmailDto) {
+    const { email, otp } = verifyEmailDto;
+
+    if (!email) {
+      throw new BadRequestException('Email không được để trống');
+    }
+
+    if (!otp) {
+      throw new BadRequestException('OTP không được để trống');
+    }
+
+    const user = await this.userService.findByEmail(email);
+
+    if (!user) {
+      throw new BadRequestException('Email không tồn tại');
+    }
+
+    if (user.isEmailVerified) {
+      return {
+        message: 'Email đã được xác thực trước đó',
+      };
+    }
+
+    const redisKey = this.getEmailOtpKey(email);
+
+    const otpInRedis = await this.redisService.get(redisKey);
+
+    if (!otpInRedis) {
+      throw new BadRequestException('OTP đã hết hạn hoặc không tồn tại');
+    }
+
+    if (otpInRedis !== otp) {
+      throw new BadRequestException('OTP không đúng');
+    }
+
+    await this.userService.updateEmailVerified(user.userId);
+
+    await this.redisService.del(redisKey);
+
+    return {
+      message: 'Xác thực email thành công',
+    };
+  }
+
+  async resendVerifyOtp(email: string) {
+    if (!email) {
+      throw new BadRequestException('Email không được để trống');
+    }
+
+    const user = await this.userService.findByEmail(email);
+
+    if (!user) {
+      throw new BadRequestException('Email không tồn tại');
+    }
+
+    if (user.isEmailVerified) {
+      return {
+        message: 'Email đã được xác thực trước đó',
+      };
+    }
+
+    const otp = this.generateOtp();
+
+    const redisKey = this.getEmailOtpKey(email);
+
+    await this.redisService.set(redisKey, otp, this.EMAIL_OTP_TTL_SECONDS);
+
+    await this.mailService.sendVerifyEmail(email, otp);
+
+    return {
+      message: 'Đã gửi lại OTP xác thực email',
     };
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.usersService.findByEmail(loginDto.email);
+    const user = await this.userService.findByEmail(loginDto.email);
 
     if (!user) {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
@@ -72,6 +160,12 @@ export class AuthService {
 
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Tài khoản đã bị khóa');
+    }
+
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedException(
+        'Vui lòng xác thực email trước khi đăng nhập',
+      );
     }
 
     const token = await this.generateToken(user.userId, user.email);
@@ -125,6 +219,14 @@ export class AuthService {
     return {
       accessToken,
     };
+  }
+
+  private generateOtp(): string {
+    return randomInt(100000, 999999).toString();
+  }
+
+  private getEmailOtpKey(email: string): string {
+    return `auth:email-verify:${email}:otp`;
   }
 
   private getRedisTokenKey(userId: string, jti: string): string {

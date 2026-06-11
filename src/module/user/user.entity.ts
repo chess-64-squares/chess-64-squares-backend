@@ -21,6 +21,9 @@ export class User {
     @Column({ name: 'status', default: UserStatus.ACTIVE })
     status: UserStatus;
 
+    @Column({ default: false })
+    isEmailVerified: boolean;
+
     @Column({ name: 'created_at', default: new Date() })
     createdAt: Date;
 }

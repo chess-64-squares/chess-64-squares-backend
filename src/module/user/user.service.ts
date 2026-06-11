@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { User } from './user.entity';
 
 @Injectable()
-export class UsersService {
+export class UserService {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
@@ -26,5 +26,9 @@ export class UsersService {
     async create(data: Partial<User>): Promise<User> {
         const user = this.userRepository.create(data);
         return this.userRepository.save(user);
+    }
+
+    async updateEmailVerified(userId: string) {
+        await this.userRepository.update(userId, { isEmailVerified: true });
     }
 }
