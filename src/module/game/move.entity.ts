@@ -3,18 +3,21 @@ import { Game } from './game.entity';
 
 @Entity('moves')
 export class Move {
-    @ManyToOne(() => Game, (game) => game.gameId)
+    @ManyToOne(() => Game, { nullable: false })
     @JoinColumn({ name: 'game_id' })
     game: Game;
 
     @PrimaryColumn({ name: 'move_number', type: 'int' })
     moveNumber: number;
 
-    @PrimaryColumn({ name: 'is_white_move', type: 'boolean' })
-    isWhiteMove: boolean;
+    @PrimaryColumn({ name: 'is_white', type: 'boolean' })
+    isWhite: boolean;
 
-    @Column({ name: 'move_notation' })
-    moveNotation: string;
+    @Column({ name: 'san' })
+    san: string;
+
+    @Column({ name: 'fen' })
+    fen: string;
 
     @Column({ name: 'time_taken', type: 'int' })
     timeTaken: number;

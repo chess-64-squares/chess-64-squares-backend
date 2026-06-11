@@ -28,6 +28,9 @@ export class Game {
     @JoinColumn({ name: 'game_mode_id' })
     gameMode: GameMode;
 
+    @Column({ name: 'fen', default: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' })
+    fen: string;
+
     @Column({ name: 'status', type: 'enum', enum: GameStatus, default: GameStatus.WAITING_FOR_OPPONENT })
     status: GameStatus;
 

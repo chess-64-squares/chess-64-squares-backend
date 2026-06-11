@@ -31,6 +31,7 @@
     "@nestjs/websockets": "^11.1.26",
     "bcrypt": "^6.0.0",
     "chess.js": "^1.4.0",
+    "class-validator": "^0.15.1",
     "ioredis": "^5.11.1",
     "nodemailer": "^8.0.11",
     "passport-jwt": "^4.0.1",
