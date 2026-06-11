@@ -1,0 +1,8 @@
+export enum ReasonForEnding {
+    CHECKMATED = 'CHECKMATE',
+    RESIGNED = 'RESIGNED',
+    STALEMATE = 'STALEMATE',
+    DRAW_AGREEMENT = 'DRAW_AGREEMENT',
+    TIMEOUT = 'TIMEOUT',
+    ABORTED = 'ABORTED'
+}

@@ -186,7 +186,7 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string, jti: string) {
+  async logout(userId: number, jti: string) {
     const redisKey = this.getRedisTokenKey(userId, jti);
 
     await this.redisService.del(redisKey);
@@ -197,18 +197,18 @@ export class AuthService {
   }
 
   async validateToken(payload: JwtPayload): Promise<boolean> {
-    const redisKey = this.getRedisTokenKey(payload.sub, payload.jti);
+    const redisKey = this.getRedisTokenKey(parseInt(payload.sub), payload.jti);
 
     const tokenInRedis = await this.redisService.get(redisKey);
 
     return !!tokenInRedis;
   }
 
-  private async generateToken(userId: string, email: string) {
+  private async generateToken(userId: number, email: string) {
     const jti = uuidv4();
 
     const payload: JwtPayload = {
-      sub: userId,
+      sub: userId + '',
       email,
       jti,
     };
@@ -236,7 +236,7 @@ export class AuthService {
     return `auth:email-verify:${email}:otp`;
   }
 
-  private getRedisTokenKey(userId: string, jti: string): string {
+  private getRedisTokenKey(userId: number, jti: string): string {
     return `auth:user:${userId}:token:${jti}`;
   }
 }

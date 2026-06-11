@@ -1,29 +1,39 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
-import { User } from "../user/user.entity";
-import { GameStatus } from "../../common/enum/game-status.enum";
-import { GameResult } from "../../common/enum/game-result.enum";
-import { GameMode } from "./game-mode.entity";
+import {
+    Column,
+    Entity,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
+} from 'typeorm';
+
+import { User } from '../user/user.entity';
+import { GameStatus } from '../../common/enum/game-status.enum';
+import { GameMode } from './game-mode.entity';
+import { ReasonForEnding } from '../../common/enum/reason-for-ending.enum';
 
 @Entity('games')
 export class Game {
     @PrimaryGeneratedColumn({ name: 'game_id' })
     gameId: number;
 
-    @Column({ name: 'player_white_id' })
+    @ManyToOne(() => User, { nullable: false })
+    @JoinColumn({ name: 'player_white_id' })
     playerWhite: User;
 
-    @Column({ name: 'player_black_id' })
+    @ManyToOne(() => User, { nullable: false })
+    @JoinColumn({ name: 'player_black_id' })
     playerBlack: User;
 
-    @Column({ name: 'status', default: GameStatus.WAITING_FOR_OPPONENT })
+    @ManyToOne(() => GameMode, { nullable: false })
+    @JoinColumn({ name: 'game_mode_id' })
+    gameMode: GameMode;
+
+    @Column({ name: 'status', type: 'enum', enum: GameStatus, default: GameStatus.WAITING_FOR_OPPONENT })
     status: GameStatus;
 
-    @Column({ name: 'date', default: new Date() })
+    @Column({ name: 'reason_for_ending', type: 'enum', enum: ReasonForEnding, nullable: true, default: null })
+    reasonForEnding: ReasonForEnding | null;
+
+    @Column({ name: 'date', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     date: Date;
-
-    @Column({ name: 'result', default: null })
-    result: GameResult;
-
-    @Column({ name: 'game_mode' })
-    gameMode: GameMode;
 }

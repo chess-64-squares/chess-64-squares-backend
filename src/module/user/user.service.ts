@@ -17,7 +17,7 @@ export class UserService {
         });
     }
 
-    async findById(userId: string): Promise<User | null> {
+    async findById(userId: number): Promise<User | null> {
         return this.userRepository.findOne({
             where: { userId },
         });
@@ -28,7 +28,7 @@ export class UserService {
         return this.userRepository.save(user);
     }
 
-    async updateEmailVerified(userId: string) {
+    async updateEmailVerified(userId: number) {
         await this.userRepository.update(userId, { isEmailVerified: true });
     }
 }

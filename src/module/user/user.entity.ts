@@ -4,7 +4,7 @@ import { UserStatus } from "../../common/enum/user-status.enum";
 @Entity('user')
 export class User {
     @PrimaryGeneratedColumn({ name: 'user_id' })
-    userId: string;
+    userId: number;
 
     @Column({ name: 'username', unique: true })
     username: string;
