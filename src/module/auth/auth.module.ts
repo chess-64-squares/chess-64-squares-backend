@@ -6,13 +6,13 @@ import { StringValue } from 'ms';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { UsersModule } from '../user/user.module';
+import { UserModule } from '../user/user.module';
 import { RedisModule } from '../redis/redis.module';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
-    UsersModule,
+    UserModule,
     RedisModule,
     MailModule,
     PassportModule,
