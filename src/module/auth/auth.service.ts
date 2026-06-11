@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,24 +15,20 @@ import { MailService } from '../mail/mail.service';
 
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { JwtPayload } from './types/jwt-payload.type';
-import { UserStatus } from '../../common/enum/user-status.enum';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { JwtPayload } from './types/jwt-payload.type';
+
+import { UserStatus } from '../../common/enum/user-status.enum';
 
 @Injectable()
 export class AuthService {
-  private readonly JWT_EXPIRES_IN = '7d';
-
-  private readonly JWT_TTL_SECONDS = 7 * 24 * 60 * 60;
-
-  private readonly EMAIL_OTP_TTL_SECONDS = 5 * 60;
-
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly mailService: MailService,
-  ) { }
+    private readonly configService: ConfigService,
+  ) {}
 
   async register(registerDto: RegisterDto) {
     const existingUser = await this.userService.findByEmail(registerDto.email);
@@ -53,7 +50,11 @@ export class AuthService {
 
     const redisKey = this.getEmailOtpKey(user.email);
 
-    await this.redisService.set(redisKey, otp, this.EMAIL_OTP_TTL_SECONDS);
+    await this.redisService.set(
+      redisKey,
+      otp,
+      Number(this.configService.get<string>('EMAIL_VERIFY_TOKEN_TTL_SECONDS'))
+    );
 
     await this.mailService.sendVerifyEmail(user.email, otp);
 
@@ -133,7 +134,11 @@ export class AuthService {
 
     const redisKey = this.getEmailOtpKey(email);
 
-    await this.redisService.set(redisKey, otp, this.EMAIL_OTP_TTL_SECONDS);
+    await this.redisService.set(
+      redisKey,
+      otp,
+      Number(this.configService.get<string>('EMAIL_VERIFY_TOKEN_TTL_SECONDS')),
+    );
 
     await this.mailService.sendVerifyEmail(email, otp);
 
@@ -208,13 +213,15 @@ export class AuthService {
       jti,
     };
 
-    const accessToken = await this.jwtService.signAsync(payload, {
-      expiresIn: this.JWT_EXPIRES_IN,
-    });
+    const accessToken = await this.jwtService.signAsync(payload);
 
     const redisKey = this.getRedisTokenKey(userId, jti);
 
-    await this.redisService.set(redisKey, accessToken, this.JWT_TTL_SECONDS);
+    await this.redisService.set(
+      redisKey,
+      accessToken,
+      Number(this.configService.get<string>('JWT_TTL_SECONDS'))
+    );
 
     return {
       accessToken,

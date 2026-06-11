@@ -43,7 +43,7 @@ export class AuthController {
     return this.authService.logout(req.user.userId, req.user.jti);
   }
 
-  @Get('verify-email')
+  @Post('verify-email')
   verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
     return this.authService.verifyEmail(verifyEmailDto);
   }
