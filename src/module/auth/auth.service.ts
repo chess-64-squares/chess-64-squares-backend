@@ -10,7 +10,7 @@ import { randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
 import { UserService } from '../user/user.service';
-import { RedisService } from '../../redis/redis.service';
+import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
 
 import { LoginDto } from './dto/login.dto';
