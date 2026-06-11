@@ -1,4 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { UserStatus } from "../../common/enum/user-status.enum";
 
 @Entity('user')
 export class User {
@@ -16,6 +17,9 @@ export class User {
 
     @Column({ name: 'elo', default: 800 })
     elo: number;
+
+    @Column({ name: 'status', default: UserStatus.ACTIVE })
+    status: UserStatus;
 
     @Column({ name: 'created_at', default: new Date() })
     createdAt: Date;
