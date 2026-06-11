@@ -1,5 +1,4 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import { url } from 'inspector';
 import Redis from 'ioredis';
 
 @Injectable()
