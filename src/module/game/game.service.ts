@@ -192,15 +192,10 @@ export class GameService {
             fen: chess.fen(),
             timeTaken: 0,
         });
-        // Kiểm tra kết thúc ván
-        let isGameOver = false;
-        let reasonForEnding: ReasonForEnding | undefined;
 
         if (chess.isGameOver()) {
-            isGameOver = true;
-
             if (chess.isCheckmate()) {
-                reasonForEnding = ReasonForEnding.CHECKMATED;
+                game.reasonForEnding = ReasonForEnding.CHECKMATED;
                 // Người vừa đi là người thắng (đối phương bị chiếu hết)
                 if (isWhite) {
                     game.status = GameStatus.WHITE_WINS;
@@ -208,19 +203,17 @@ export class GameService {
                     game.status = GameStatus.BLACK_WINS;
                 }
             } else if (chess.isStalemate()) {
-                reasonForEnding = ReasonForEnding.STALEMATE;
+                game.reasonForEnding = ReasonForEnding.STALEMATE;
                 game.status = GameStatus.DRAW;
             } else if (chess.isThreefoldRepetition()) {
-                reasonForEnding = ReasonForEnding.REPETITION;
+                game.reasonForEnding = ReasonForEnding.REPETITION;
                 game.status = GameStatus.DRAW;
             } else if (chess.isInsufficientMaterial()) {
-                reasonForEnding = ReasonForEnding.INSUFFICIENT_MATERIAL;
+                game.reasonForEnding = ReasonForEnding.INSUFFICIENT_MATERIAL;
                 game.status = GameStatus.DRAW;
             } else if (chess.isDraw()) {
                 game.status = GameStatus.DRAW;
             }
-
-            game.reasonForEnding = reasonForEnding ?? null;
         }
 
         await this.gameRepository.save(game);
