@@ -1,7 +1,6 @@
-// src/modules/game/dto/make-move.dto.ts
 import { IsInt, IsNotEmpty, IsString } from 'class-validator';
 
-export class MakeMoveDto {
+export class MakeMoveReqDto {
     @IsInt()
     @IsNotEmpty()
     gameId: number;

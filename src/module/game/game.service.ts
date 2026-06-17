@@ -4,13 +4,12 @@ import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 import { UserService } from "../user/user.service";
 import { GameModeService } from "./game-mode.service";
-import { Chess, Move } from "chess.js";
-import { MakeMoveDto } from "./dto/make-move.dto";
+import { Chess } from "chess.js";
+import { MakeMoveReqDto, GameResDto} from "./dto";
 import { ReasonForEnding } from "../../common/enum/reason-for-ending.enum";
 import { GameStatus } from "../../common/enum/game-status.enum";
 import { MoveService } from "./move.service";
 import { AppException, ErrorCode } from "../../common/exceptions";
-import { GameResDto } from "./dto/game-res.dto";
 
 interface QueueEntry {
     userId: number;
@@ -140,8 +139,8 @@ export class GameService {
 
     async makeMove(
         userId: number,
-        dto: MakeMoveDto,
-    ): Promise<GameResDto> {
+        dto: MakeMoveReqDto,
+    ): Promise<{ game: GameResDto; san: string; }> {
         const game = await this.getGameById(dto.gameId);
 
         if (game.status !== GameStatus.IN_PROGRESS) {
@@ -224,7 +223,7 @@ export class GameService {
 
         await this.gameRepository.save(game);
 
-        return game;
+        return { game, san: moveResult.san };
     }
 
     async resign(userId: number, gameId: number,): Promise<GameResDto> {

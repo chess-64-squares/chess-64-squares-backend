@@ -1,4 +1,3 @@
-// src/modules/game/game.gateway.ts
 import {
     WebSocketGateway,
     WebSocketServer,
@@ -9,11 +8,10 @@ import {
     MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UseGuards, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 
 import { GameService } from './game.service';
-import { FindMatchDto } from './dto/find-match.dto';
-import { MakeMoveDto } from './dto/make-move.dto';
+import { FindMatchReqDto, MakeMoveReqDto } from './dto';
 import { WsJwtGuard } from '../auth/guards/ws-jwt.guard'; // điều chỉnh theo guard hiện có của bạn
 import { GameStatus } from '../../common/enum/game-status.enum';
 
@@ -38,7 +36,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Map userId -> socketId, dùng để gửi message riêng cho từng user
     private userSocketMap: Map<number, string> = new Map();
 
-    constructor(private readonly gameService: GameService) {}
+    constructor(private readonly gameService: GameService) { }
 
     handleConnection(client: AuthenticatedSocket) {
         // userId nên được gán từ middleware xác thực JWT (xem ghi chú bên dưới)
@@ -76,7 +74,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @SubscribeMessage('findMatch')
     async handleFindMatch(
         @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() dto: FindMatchDto,
+        @MessageBody() dto: FindMatchReqDto,
     ) {
         const userId = client.data.userId;
 
@@ -144,7 +142,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @SubscribeMessage('makeMove')
     async handleMakeMove(
         @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() dto: MakeMoveDto,
+        @MessageBody() dto: MakeMoveReqDto,
     ) {
         const userId = client.data.userId;
         const room = `game_${dto.gameId}`;
@@ -162,11 +160,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             });
 
             // Nếu ván kết thúc -> thông báo riêng
-            if (result.status in [GameStatus.WHITE_WINS, GameStatus.BLACK_WINS, GameStatus.DRAW, GameStatus.ABORTED]) {
+            if (result.game.status in [GameStatus.WHITE_WINS, GameStatus.BLACK_WINS, GameStatus.DRAW, GameStatus.ABORTED]) {
                 this.server.to(room).emit('gameOver', {
                     gameId: result.game.gameId,
-                    reasonForEnding: result.reasonForEnding,
-                    status: result.status,
+                    reasonForEnding: result.game.reasonForEnding,
+                    status: result.game.status,
                 });
             }
         } catch (error) {
@@ -189,12 +187,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const room = `game_${data.gameId}`;
 
         try {
-            const result = await this.gameService.resign(userId, data.gameId);
+            const game = await this.gameService.resign(userId, data.gameId);
 
             this.server.to(room).emit('gameOver', {
-                gameId: result.game.gameId,
-                reasonForEnding: result.game.reasonForEnding,
-                status: result.game.status,
+                gameId: game.gameId,
+                reasonForEnding: game.reasonForEnding,
+                status: game.status,
             });
         } catch (error) {
             client.emit('error', { message: 'Đã xảy ra lỗi khi đầu hàng' });
