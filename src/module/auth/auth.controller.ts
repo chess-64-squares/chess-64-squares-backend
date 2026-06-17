@@ -4,10 +4,9 @@ import {
   Post,
 } from '@nestjs/common';
 
+import { LoginReqDto, LoginResDto, RegisterReqDto, VerifyEmailReqDto, } from './dto'
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ApiResponse } from '../../common/response/api-response';
 
 
 @Controller('auth')
@@ -15,17 +14,17 @@ export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(@Body() registerReqDto: RegisterReqDto): Promise<any> {
+    return this.authService.register(registerReqDto);
   }
 
   @Post('login')
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() loginReqDto: LoginReqDto): Promise<ApiResponse<LoginResDto>> {
+    return this.authService.login(loginReqDto);
   }
 
   @Post('verify-email')
-  verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-    return this.authService.verifyEmail(verifyEmailDto);
+  async verifyEmail(@Body() verifyEmailReqDto: VerifyEmailReqDto) {
+    return this.authService.verifyEmail(verifyEmailReqDto);
   }
 }

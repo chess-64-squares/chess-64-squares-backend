@@ -13,12 +13,15 @@ import { UserService } from '../user/user.service';
 import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
 
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
+import { LoginReqDto } from './dto/login-req.dto';
+import { RegisterReqDto } from './dto/register-req';
+import { VerifyEmailReqDto } from './dto/verify-email-req';
 import { JwtPayload } from './types/jwt-payload.type';
 
 import { UserStatus } from '../../common/enum/user-status.enum';
+import { AppException, ErrorCode } from '../../common/exceptions';
+import { LoginResDto } from './dto';
+import { ApiResponse } from '../../common/response/api-response';
 
 @Injectable()
 export class AuthService {
@@ -28,20 +31,20 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
-  async register(registerDto: RegisterDto) {
-    const existingUser = await this.userService.findByEmail(registerDto.email);
+  async register(registerReqDto: RegisterReqDto) {
+    const existingUser = await this.userService.findByEmail(registerReqDto.email);
 
     if (existingUser) {
       throw new BadRequestException('Email đã được sử dụng');
     }
 
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const hashedPassword = await bcrypt.hash(registerReqDto.password, 10);
 
     const user = await this.userService.create({
-      email: registerDto.email,
-      username: registerDto.username,
+      email: registerReqDto.email,
+      username: registerReqDto.username,
       password: hashedPassword,
       isEmailVerified: false,
     });
@@ -69,8 +72,8 @@ export class AuthService {
     };
   }
 
-  async verifyEmail(verifyEmailDto: VerifyEmailDto) {
-    const { email, otp } = verifyEmailDto;
+  async verifyEmail(verifyEmailReqDto: VerifyEmailReqDto) {
+    const { email, otp } = verifyEmailReqDto;
 
     if (!email) {
       throw new BadRequestException('Email không được để trống');
@@ -147,43 +150,41 @@ export class AuthService {
     };
   }
 
-  async login(loginDto: LoginDto) {
-    const user = await this.userService.findByEmail(loginDto.email);
+  async login(loginReqDto: LoginReqDto) {
+    const { username, password } = loginReqDto;
+
+    let user = await this.userService.findByUsername(username);
 
     if (!user) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      user = await this.userService.findByEmail(username);
+    }
+
+    if (!user) {
+      throw new AppException(ErrorCode.INVALID_USERNAME, 'Invalid username or email');
     }
 
     const isPasswordValid = await bcrypt.compare(
-      loginDto.password,
+      loginReqDto.password,
       user.password,
     );
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new AppException(ErrorCode.INVALID_PASSWORD, 'Invalid password');
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Tài khoản đã bị khóa');
+      throw new AppException(ErrorCode.ACCOUNT_NOT_ACTIVE, 'Account is not active');
     }
 
     if (!user.isEmailVerified) {
-      throw new UnauthorizedException(
-        'Vui lòng xác thực email trước khi đăng nhập',
-      );
+      throw new AppException(ErrorCode.EMAIL_NOT_VERIFIED, 'Please verify your email before logging in');
     }
 
-    const token = await this.generateToken(user.userId, user.email);
+    const token = await this.generateToken(user.userId, user.username);
 
-    return {
-      message: 'Đăng nhập thành công',
-      user: {
-        id: user.userId,
-        email: user.email,
-        username: user.username,
-      },
-      accessToken: token.accessToken,
-    };
+    const loginRes: LoginResDto = { token };
+
+    return ApiResponse.success(loginRes, 'Successfully');
   }
 
   async logout(userId: number, jti: string) {
@@ -204,7 +205,7 @@ export class AuthService {
     return !!tokenInRedis;
   }
 
-  private async generateToken(userId: number, email: string) {
+  private async generateToken(userId: number, email: string): Promise<string> {
     const jti = uuidv4();
 
     const payload: JwtPayload = {
@@ -223,9 +224,7 @@ export class AuthService {
       Number(this.configService.get<string>('JWT_TTL_SECONDS'))
     );
 
-    return {
-      accessToken,
-    };
+    return accessToken;
   }
 
   private generateOtp(): string {

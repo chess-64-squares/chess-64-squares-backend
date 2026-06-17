@@ -1,4 +1,4 @@
-export class VerifyEmailDto {
+export class VerifyEmailReqDto {
     email: string;
     otp: string;
 }
