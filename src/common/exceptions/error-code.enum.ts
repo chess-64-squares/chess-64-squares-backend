@@ -6,4 +6,7 @@ export enum ErrorCode {
     INVALID_OTP = '01005',
     ACCOUNT_NOT_ACTIVE = '01006',
     EMAIL_NOT_VERIFIED = '01007',
+    EMAIL_EXISTS = '01008',
+    USERNAME_EXISTS = '01009',
+    EMAIL_VERIFYED = '01010',
 }

@@ -37,7 +37,13 @@ export class AuthService {
     const existingUser = await this.userService.findByEmail(registerReqDto.email);
 
     if (existingUser) {
-      throw new BadRequestException('Email đã được sử dụng');
+      throw new AppException(ErrorCode.EMAIL_EXISTS, 'Email already exists');
+    }
+
+    const existingUsername = await this.userService.findByUsername(registerReqDto.username);
+
+    if (existingUsername) {
+      throw new AppException(ErrorCode.USERNAME_EXISTS, 'Username already exists');
     }
 
     const hashedPassword = await bcrypt.hash(registerReqDto.password, 10);
@@ -61,15 +67,7 @@ export class AuthService {
 
     await this.mailService.sendVerifyEmail(user.email, otp);
 
-    return {
-      message: 'Đăng kí thành công. Vui lòng kiểm tra email để lấy mã OTP',
-      user: {
-        id: user.userId,
-        email: user.email,
-        username: user.username,
-        isEmailVerified: user.isEmailVerified,
-      },
-    };
+    return ApiResponse.success(null, 'User registered successfully. Please verify your email.');
   }
 
   async verifyEmail(verifyEmailReqDto: VerifyEmailReqDto) {
@@ -90,9 +88,7 @@ export class AuthService {
     }
 
     if (user.isEmailVerified) {
-      return {
-        message: 'Email đã được xác thực trước đó',
-      };
+      throw new AppException(ErrorCode.EMAIL_VERIFIED, 'Email is already verified');
     }
 
     const redisKey = this.getEmailOtpKey(email);
@@ -111,9 +107,7 @@ export class AuthService {
 
     await this.redisService.del(redisKey);
 
-    return {
-      message: 'Xác thực email thành công',
-    };
+    return ApiResponse.success(null, 'Email verified successfully');
   }
 
   async resendVerifyOtp(email: string) {
@@ -128,9 +122,7 @@ export class AuthService {
     }
 
     if (user.isEmailVerified) {
-      return {
-        message: 'Email đã được xác thực trước đó',
-      };
+      throw new AppException(ErrorCode.EMAIL_VERIFIED, 'Email is already verified');
     }
 
     const otp = this.generateOtp();
@@ -145,9 +137,7 @@ export class AuthService {
 
     await this.mailService.sendVerifyEmail(email, otp);
 
-    return {
-      message: 'Đã gửi lại OTP xác thực email',
-    };
+    return ApiResponse.success(null, 'OTP resent successfully');
   }
 
   async login(loginReqDto: LoginReqDto) {
@@ -192,9 +182,7 @@ export class AuthService {
 
     await this.redisService.del(redisKey);
 
-    return {
-      message: 'Đăng xuất thành công',
-    };
+    return ApiResponse.success(null, 'Logged out successfully');
   }
 
   async validateToken(payload: JwtPayload): Promise<boolean> {
@@ -209,7 +197,7 @@ export class AuthService {
     const jti = uuidv4();
 
     const payload: JwtPayload = {
-      sub: userId + '',
+      sub: userId.toString(),
       email,
       jti,
     };
