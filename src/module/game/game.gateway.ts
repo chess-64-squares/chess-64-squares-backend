@@ -12,7 +12,6 @@ import { Logger } from '@nestjs/common';
 
 import { GameService } from './game.service';
 import { FindMatchReqDto, MakeMoveReqDto } from './dto';
-import { WsJwtGuard } from '../auth/guards/ws-jwt.guard'; // điều chỉnh theo guard hiện có của bạn
 import { GameStatus } from '../../common/enum/game-status.enum';
 
 interface AuthenticatedSocket extends Socket {

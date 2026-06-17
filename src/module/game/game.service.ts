@@ -5,7 +5,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { UserService } from "../user/user.service";
 import { GameModeService } from "./game-mode.service";
 import { Chess } from "chess.js";
-import { MakeMoveReqDto, GameResDto} from "./dto";
+import { MakeMoveReqDto, GameResDto } from "./dto";
 import { ReasonForEnding } from "../../common/enum/reason-for-ending.enum";
 import { GameStatus } from "../../common/enum/game-status.enum";
 import { MoveService } from "./move.service";
@@ -183,12 +183,14 @@ export class GameService {
 
         // Lưu lịch sử nước đi
         const moveCount = await this.moveService.count(game.gameId, isWhite);
+
         await this.moveService.create({
-            game,
+            gameId: game.gameId,
             isWhite,
             moveNumber: moveCount + 1,
             san: moveResult.san,
             fen: chess.fen(),
+            timeTaken: 0,
         });
         // Kiểm tra kết thúc ván
         let isGameOver = false;

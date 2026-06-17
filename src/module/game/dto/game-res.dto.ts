@@ -1,13 +1,13 @@
 import { GameStatus } from "../../../common/enum/game-status.enum";
 import { ReasonForEnding } from "../../../common/enum/reason-for-ending.enum";
-import { User } from "../../user/user.entity";
-import { GameMode } from "../game-mode.entity";
+import { UserResDto } from "../../user/dto/user-res.dto";
+import { GameModeResDto } from "./";
 
 export class GameResDto {
     gameId: number;
-    playerWhite: User;
-    playerBlack: User;
-    gameMode: GameMode;
+    playerWhite: UserResDto;
+    playerBlack: UserResDto;
+    gameMode: GameModeResDto;
     fen: string;
     status: GameStatus;
     reasonForEnding: ReasonForEnding | null;
