@@ -2,8 +2,6 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { Game } from "./game.entity";
 import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
-import { CreateGameDto } from "./dto/create-game.dto";
-import { GameMode } from "./game-mode.entity";
 import { UserService } from "../user/user.service";
 import { GameModeService } from "./game-mode.service";
 import { Chess, Move } from "chess.js";
@@ -11,13 +9,14 @@ import { MakeMoveDto } from "./dto/make-move.dto";
 import { ReasonForEnding } from "../../common/enum/reason-for-ending.enum";
 import { GameStatus } from "../../common/enum/game-status.enum";
 import { MoveService } from "./move.service";
+import { AppException, ErrorCode } from "../../common/exceptions";
+import { GameResDto } from "./dto/game-res.dto";
 
 interface QueueEntry {
     userId: number;
     gameModeId: number;
     socketId: string;
 }
-
 
 @Injectable()
 export class GameService {
@@ -31,27 +30,27 @@ export class GameService {
         private readonly gameModeService: GameModeService
     ) { }
 
-    async create(playerWhiteId: number, playerBlackId: number, gameModeId: number): Promise<Game> {
+    async create(playerWhiteId: number, playerBlackId: number, gameModeId: number): Promise<GameResDto> {
         const playerWhite = await this.userService.findById(playerWhiteId);
 
         if (!playerWhite) {
-            throw new BadRequestException('Player white not found');
+            throw new AppException(ErrorCode.USER_NOT_FOUND, 'Player white not found');
         }
 
         const playerBlack = await this.userService.findById(playerBlackId);
 
         if (!playerBlack) {
-            throw new BadRequestException('Player black not found');
+            throw new AppException(ErrorCode.USER_NOT_FOUND, 'Player black not found');
         }
 
         const gameMode = await this.gameModeService.findById(gameModeId);
 
         if (!gameMode) {
-            throw new BadRequestException('Game mode not found');
+            throw new AppException(ErrorCode.GAME_MODE_NOT_FOUND, 'Game mode not found');
         }
 
         if (playerWhite.userId === playerBlack.userId) {
-            throw new BadRequestException('Player white and player black must be different');
+            throw new AppException(ErrorCode.USERS_SAME, 'Players cannot be the same');
         }
 
         const newGame = this.gameRepository.create({
@@ -60,14 +59,25 @@ export class GameService {
             gameMode,
         });
 
-        return this.gameRepository.save(newGame);
+        const savedGame = await this.gameRepository.save(newGame);
+        const gameRes: GameResDto = {
+            gameId: savedGame.gameId,
+            playerWhite: savedGame.playerWhite,
+            playerBlack: savedGame.playerBlack,
+            gameMode: savedGame.gameMode,
+            fen: savedGame.fen,
+            status: savedGame.status,
+            reasonForEnding: savedGame.reasonForEnding,
+            date: savedGame.date,
+        };
+        return gameRes;
     }
 
     async findMatch(
         userId: number,
         gameModeId: number,
         socketId: string,
-    ): Promise<Game | null> {
+    ): Promise<GameResDto | null> {
         const gameMode = await this.gameModeService.findById(gameModeId);
         if (!gameMode) {
             throw new NotFoundException('Game mode không tồn tại');
@@ -117,13 +127,13 @@ export class GameService {
         return this.matchmakingQueue.get(gameModeId)?.find((e) => e.userId === userId);
     }
 
-    async getGameById(gameId: number): Promise<Game> {
+    async getGameById(gameId: number): Promise<GameResDto> {
         const game = await this.gameRepository.findOne({
             where: { gameId },
             relations: ['playerWhite', 'playerBlack', 'gameMode'],
         });
         if (!game) {
-            throw new NotFoundException('Trận đấu không tồn tại');
+            throw new AppException(ErrorCode.GAME_NOT_FOUND, 'Game not found');
         }
         return game;
     }
@@ -131,20 +141,15 @@ export class GameService {
     async makeMove(
         userId: number,
         dto: MakeMoveDto,
-    ): Promise<{
-        game: Game;
-        san: string;
-        status: GameStatus;
-        reasonForEnding: ReasonForEnding | null;
-    }> {
+    ): Promise<GameResDto> {
         const game = await this.getGameById(dto.gameId);
 
         if (game.status !== GameStatus.IN_PROGRESS) {
-            throw new BadRequestException('Trận đấu không ở trạng thái đang diễn ra');
+            throw new AppException(ErrorCode.GAME_NOT_IN_PROGRESS, 'Game not in progress');
         }
 
         if (game.playerWhite.userId !== userId && game.playerBlack.userId !== userId) {
-            throw new BadRequestException('Bạn không phải người chơi trong trận này');
+            throw new AppException(ErrorCode.USER_NOT_IN_GAME, 'You are not a player in this game');
         }
 
         const isWhite = game.playerWhite.userId === userId;
@@ -155,7 +160,7 @@ export class GameService {
         // Kiểm tra đúng lượt
         const turn = chess.turn(); // 'w' hoặc 'b'
         if ((turn === 'w' && !isWhite) || (turn === 'b' && isWhite)) {
-            throw new BadRequestException('Chưa đến lượt của bạn');
+            throw new AppException(ErrorCode.NOT_YOUR_TURN, 'Not your turn');
         }
 
         // Thử thực hiện nước đi
@@ -171,7 +176,7 @@ export class GameService {
         }
 
         if (!moveResult) {
-            throw new BadRequestException('Nước đi không hợp lệ');
+            throw new AppException(ErrorCode.INVALID_MOVE, 'Invalid move');
         }
 
         // Cập nhật FEN mới vào game
@@ -189,7 +194,6 @@ export class GameService {
         // Kiểm tra kết thúc ván
         let isGameOver = false;
         let reasonForEnding: ReasonForEnding | undefined;
-        let winnerId: number | null | undefined;
 
         if (chess.isGameOver()) {
             isGameOver = true;
@@ -220,23 +224,18 @@ export class GameService {
 
         await this.gameRepository.save(game);
 
-        return {
-            game,
-            san: moveResult.san,
-            status: game.status,
-            reasonForEnding: game.reasonForEnding,
-        };
+        return game;
     }
 
-    async resign(userId: number, gameId: number,): Promise<{ game: Game; status: GameStatus; reasonForEnding: ReasonForEnding }> {
+    async resign(userId: number, gameId: number,): Promise<GameResDto> {
         const game = await this.getGameById(gameId);
 
         if (game.status !== GameStatus.IN_PROGRESS) {
-            throw new BadRequestException('Trận đấu không ở trạng thái đang diễn ra');
+            throw new AppException(ErrorCode.GAME_NOT_IN_PROGRESS, 'Game not in progress');
         }
 
         if (game.playerWhite.userId !== userId && game.playerBlack.userId !== userId) {
-            throw new BadRequestException('Bạn không phải người chơi trong trận này');
+            throw new AppException(ErrorCode.USER_NOT_IN_GAME, 'You are not a player in this game');
         }
 
         const isWhite = game.playerWhite.userId === userId;
@@ -246,30 +245,30 @@ export class GameService {
 
         await this.gameRepository.save(game);
 
-        return { game, status: game.status, reasonForEnding: game.reasonForEnding };
+        return game;
     }
 
-    async forfeitByDisconnect(userId: number, gameId: number): Promise<{ game: Game; status: GameStatus; reasonForEnding: ReasonForEnding } | null> {
+    async forfeitByDisconnect(userId: number, gameId: number): Promise<GameResDto | null> {
         const game = await this.getGameById(gameId);
 
-        if (game.status !== GameStatus.IN_PROGRESS) {
-            return null;
+        if (!game) {
+            throw new AppException(ErrorCode.GAME_NOT_FOUND, 'Game not found');
         }
 
-        if(game.playerWhite.userId !== userId && game.playerBlack.userId !== userId) 
-            throw new BadRequestException('Bạn không phải người chơi trong trận này');
+        if (game.status !== GameStatus.IN_PROGRESS) {
+            throw new AppException(ErrorCode.GAME_NOT_IN_PROGRESS, 'Game not in progress');
+        }
+
+        if (game.playerWhite.userId !== userId && game.playerBlack.userId !== userId)
+            throw new AppException(ErrorCode.USER_NOT_IN_GAME, 'You are not a player in this game');
 
         const isWhite = game.playerWhite.userId === userId;
-
-        if (!isWhite) {
-            return null;
-        }
 
         game.status = isWhite ? GameStatus.BLACK_WINS : GameStatus.WHITE_WINS;
         game.reasonForEnding = ReasonForEnding.DISCONNECT;
 
         await this.gameRepository.save(game);
 
-        return { game, status: game.status, reasonForEnding: game.reasonForEnding };
+        return game;
     }
 }
