@@ -1,4 +1,5 @@
 import { UserStatus } from "../../../common/enum/user-status.enum";
+import { GameResDto } from "../../game/dto";
 
 export class UserResDto {
     userId: number;

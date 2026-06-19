@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -13,15 +12,11 @@ import { UserService } from '../user/user.service';
 import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
 
-import { LoginReqDto } from './dto/login-req.dto';
-import { RegisterReqDto } from './dto/register-req';
-import { VerifyEmailReqDto } from './dto/verify-email-req';
+import { LoginReqDto, RegisterReqDto, VerifyEmailReqDto, LoginResDto } from './dto';
 import { JwtPayload } from './types/jwt-payload.type';
 
 import { UserStatus } from '../../common/enum/user-status.enum';
 import { AppException, ErrorCode } from '../../common/exceptions';
-import { LoginResDto } from './dto';
-import { ApiResponse } from '../../common/response/api-response';
 
 @Injectable()
 export class AuthService {
@@ -33,7 +28,7 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) { }
 
-  async register(registerReqDto: RegisterReqDto) {
+  async register(registerReqDto: RegisterReqDto): Promise<void> {
     const existingUser = await this.userService.findByEmail(registerReqDto.email);
 
     if (existingUser) {
@@ -66,11 +61,9 @@ export class AuthService {
     );
 
     await this.mailService.sendVerifyEmail(user.email, otp);
-
-    return ApiResponse.success(null, 'User registered successfully. Please verify your email.');
   }
 
-  async verifyEmail(verifyEmailReqDto: VerifyEmailReqDto) {
+  async verifyEmail(verifyEmailReqDto: VerifyEmailReqDto): Promise<void> {
     const { email, otp } = verifyEmailReqDto;
 
     if (!email) {
@@ -106,11 +99,9 @@ export class AuthService {
     await this.userService.updateEmailVerified(user.userId);
 
     await this.redisService.del(redisKey);
-
-    return ApiResponse.success(null, 'Email verified successfully');
   }
 
-  async resendVerifyOtp(email: string) {
+  async resendVerifyOtp(email: string): Promise<void> {
     if (!email) {
       throw new BadRequestException('Email không được để trống');
     }
@@ -136,11 +127,9 @@ export class AuthService {
     );
 
     await this.mailService.sendVerifyEmail(email, otp);
-
-    return ApiResponse.success(null, 'OTP resent successfully');
   }
 
-  async login(loginReqDto: LoginReqDto) {
+  async login(loginReqDto: LoginReqDto): Promise<LoginResDto> {
     const { username, password } = loginReqDto;
 
     let user = await this.userService.findByUsername(username);
@@ -153,10 +142,7 @@ export class AuthService {
       throw new AppException(ErrorCode.INVALID_USERNAME, 'Invalid username or email');
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      loginReqDto.password,
-      user.password,
-    );
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       throw new AppException(ErrorCode.INVALID_PASSWORD, 'Invalid password');
@@ -174,15 +160,13 @@ export class AuthService {
 
     const loginRes: LoginResDto = { token };
 
-    return ApiResponse.success(loginRes, 'Successfully');
+    return loginRes;
   }
 
-  async logout(userId: number, jti: string) {
+  async logout(userId: number, jti: string): Promise<void> {
     const redisKey = this.getRedisTokenKey(userId, jti);
 
     await this.redisService.del(redisKey);
-
-    return ApiResponse.success(null, 'Logged out successfully');
   }
 
   async validateToken(payload: JwtPayload): Promise<boolean> {

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Game } from "./game.entity";
 import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -264,5 +264,33 @@ export class GameService {
         await this.gameRepository.save(game);
 
         return game;
+    }
+
+    async getGamesByUserId(userId: number): Promise<GameResDto[]> {
+        const games = await this.gameRepository.find({
+            where: [
+                { playerWhite: { userId } },
+                { playerBlack: { userId } },
+            ],
+            relations: ['playerWhite', 'playerBlack', 'gameMode'],
+            order: {
+                date: 'DESC',
+            },
+        });
+        return games;
+    }
+
+    async getGamesByUsername(username: string): Promise<GameResDto[]> {
+        const games = await this.gameRepository.find({
+            where: [
+                { playerWhite: { username } },
+                { playerBlack: { username } },
+            ],
+            relations: ['playerWhite', 'playerBlack', 'gameMode'],
+            order: {
+                date: 'DESC',
+            },
+        });
+        return games;
     }
 }

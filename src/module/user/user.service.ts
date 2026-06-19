@@ -3,12 +3,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { User } from './user.entity';
+import { ApiResponse } from '../../common/response/api-response';
+import { UserResDto } from './dto';
+import { AppException, ErrorCode } from '../../common/exceptions';
+import { GameService } from '../game/game.service';
 
 @Injectable()
 export class UserService {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
+        private readonly gameService: GameService,
     ) { }
 
     async findByEmail(email: string): Promise<User | null> {
@@ -36,5 +41,25 @@ export class UserService {
 
     async updateEmailVerified(userId: number) {
         await this.userRepository.update(userId, { isEmailVerified: true });
+    }
+
+    async getProfile(userId: number): Promise<UserResDto> {
+        const user = await this.userRepository.findOne({
+            where: { userId }
+        });
+        if (!user)
+            throw new AppException(ErrorCode.USER_NOT_FOUND, 'User not found');
+
+        return user;
+    }
+
+    async getProfileByUsername(username: string): Promise<UserResDto> {
+        const user = await this.userRepository.findOne({
+            where: { username },
+            select: ['username', 'elo', 'status', 'createdAt']
+        });
+        if (!user)
+            throw new AppException(ErrorCode.USER_NOT_FOUND, 'User not found');
+        return user;
     }
 }
