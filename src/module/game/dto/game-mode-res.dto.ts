@@ -1,6 +1,6 @@
 export class GameModeResDto {
-    gameModeId: number;
-    gameModeName: string;
-    time: number;
-    plusPerMove: number;
+  gameModeId: number;
+  gameModeName: string;
+  time: number;
+  plusPerMove: number;
 }

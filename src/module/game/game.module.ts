@@ -16,17 +16,15 @@ import { MoveService } from './move.service';
 import { GameModeService } from './game-mode.service';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([Game, Move, GameMode, User]),
-    ],
-    providers: [
-        GameService,
-        GameGateway,
-        MoveService,
-        GameModeService,
-        UserService,
-    ],
-    controllers: [GameController],
-    exports: [GameService],
+  imports: [TypeOrmModule.forFeature([Game, Move, GameMode, User])],
+  providers: [
+    GameService,
+    GameGateway,
+    MoveService,
+    GameModeService,
+    UserService,
+  ],
+  controllers: [GameController],
+  exports: [GameService],
 })
-export class GameModule { }
+export class GameModule {}

@@ -1,18 +1,27 @@
-import { Injectable, Logger, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private readonly redis: Redis;
-  private readonly memoryStore = new Map<string, { value: string; expiresAt: number | null }>();
+  private readonly memoryStore = new Map<
+    string,
+    { value: string; expiresAt: number | null }
+  >();
   private hasWarnedFallback = false;
 
   constructor() {
     this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
       lazyConnect: true,
       maxRetriesPerRequest: 1,
-      retryStrategy: (times) => (times > 3 ? null : Math.min(times * 200, 1000)),
+      retryStrategy: (times) =>
+        times > 3 ? null : Math.min(times * 200, 1000),
     });
 
     this.redis.on('error', (error) => {

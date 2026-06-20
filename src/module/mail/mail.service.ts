@@ -19,9 +19,10 @@ export class MailService {
   }
 
   async sendVerifyEmail(email: string, token: string) {
-    const appUrl = this.configService.get<string>('APP_URL');
+    const appUrl =
+      this.configService.get<string>('WEB_URL') ?? 'https://localhost:5173';
 
-    const verifyUrl = `${appUrl}/api/v1/auth/verify-email?token=${token}`;
+    const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(token)}`;
 
     const transporter = this.createTransporter();
 
@@ -31,13 +32,13 @@ export class MailService {
         to: email,
         subject: 'Verify your Chess 64 Squares account',
         html: `
-          <h2>Xác thực tài khoản</h2>
-          <p>Vui lòng bấm vào link bên dưới để xác thực email:</p>
+          <h2>Verify your account</h2>
+          <p>Click the link below to verify your email:</p>
           <a href="${verifyUrl}">${verifyUrl}</a>
-          <p>Link này sẽ hết hạn sau 15 phút.</p>
+          <p>This link expires in 15 minutes.</p>
         `,
       });
-    } catch (error) {
+    } catch {
       throw new InternalServerErrorException('Can not send verification email');
     }
   }

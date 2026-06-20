@@ -1,7 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -12,7 +9,12 @@ import { UserService } from '../user/user.service';
 import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
 
-import { LoginReqDto, RegisterReqDto, VerifyEmailReqDto, LoginResDto } from './dto';
+import {
+  LoginReqDto,
+  RegisterReqDto,
+  VerifyEmailReqDto,
+  LoginResDto,
+} from './dto';
 import { JwtPayload } from './types/jwt-payload.type';
 
 import { UserStatus } from '../../common/enum/user-status.enum';
@@ -26,19 +28,26 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   async register(registerReqDto: RegisterReqDto): Promise<void> {
-    const existingUser = await this.userService.findByEmail(registerReqDto.email);
+    const existingUser = await this.userService.findByEmail(
+      registerReqDto.email,
+    );
 
     if (existingUser) {
       throw new AppException(ErrorCode.EMAIL_EXISTS, 'Email already exists');
     }
 
-    const existingUsername = await this.userService.findByUsername(registerReqDto.username);
+    const existingUsername = await this.userService.findByUsername(
+      registerReqDto.username,
+    );
 
     if (existingUsername) {
-      throw new AppException(ErrorCode.USERNAME_EXISTS, 'Username already exists');
+      throw new AppException(
+        ErrorCode.USERNAME_EXISTS,
+        'Username already exists',
+      );
     }
 
     const hashedPassword = await bcrypt.hash(registerReqDto.password, 10);
@@ -57,14 +66,23 @@ export class AuthService {
     await this.redisService.set(
       redisKey,
       otp,
-      Number(this.configService.get<string>('EMAIL_VERIFY_TOKEN_TTL_SECONDS'))
+      Number(this.configService.get<string>('EMAIL_VERIFY_TOKEN_TTL_SECONDS')),
     );
 
-    await this.mailService.sendVerifyEmail(user.email, otp);
+    await this.mailService.sendVerifyEmail(
+      user.email,
+      this.createEmailVerifyToken(user.email, otp),
+    );
   }
 
   async verifyEmail(verifyEmailReqDto: VerifyEmailReqDto): Promise<void> {
-    const { email, otp } = verifyEmailReqDto;
+    let { email, otp } = verifyEmailReqDto;
+
+    if (verifyEmailReqDto.token) {
+      const decoded = this.parseEmailVerifyToken(verifyEmailReqDto.token);
+      email = decoded.email;
+      otp = decoded.otp;
+    }
 
     if (!email) {
       throw new BadRequestException('Email không được để trống');
@@ -81,7 +99,10 @@ export class AuthService {
     }
 
     if (user.isEmailVerified) {
-      throw new AppException(ErrorCode.EMAIL_VERIFIED, 'Email is already verified');
+      throw new AppException(
+        ErrorCode.EMAIL_VERIFIED,
+        'Email is already verified',
+      );
     }
 
     const redisKey = this.getEmailOtpKey(email);
@@ -113,7 +134,10 @@ export class AuthService {
     }
 
     if (user.isEmailVerified) {
-      throw new AppException(ErrorCode.EMAIL_VERIFIED, 'Email is already verified');
+      throw new AppException(
+        ErrorCode.EMAIL_VERIFIED,
+        'Email is already verified',
+      );
     }
 
     const otp = this.generateOtp();
@@ -126,7 +150,10 @@ export class AuthService {
       Number(this.configService.get<string>('EMAIL_VERIFY_TOKEN_TTL_SECONDS')),
     );
 
-    await this.mailService.sendVerifyEmail(email, otp);
+    await this.mailService.sendVerifyEmail(
+      email,
+      this.createEmailVerifyToken(email, otp),
+    );
   }
 
   async login(loginReqDto: LoginReqDto): Promise<LoginResDto> {
@@ -139,7 +166,10 @@ export class AuthService {
     }
 
     if (!user) {
-      throw new AppException(ErrorCode.INVALID_USERNAME, 'Invalid username or email');
+      throw new AppException(
+        ErrorCode.INVALID_USERNAME,
+        'Invalid username or email',
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -149,11 +179,17 @@ export class AuthService {
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new AppException(ErrorCode.ACCOUNT_NOT_ACTIVE, 'Account is not active');
+      throw new AppException(
+        ErrorCode.ACCOUNT_NOT_ACTIVE,
+        'Account is not active',
+      );
     }
 
     if (!user.isEmailVerified) {
-      throw new AppException(ErrorCode.EMAIL_NOT_VERIFIED, 'Please verify your email before logging in');
+      throw new AppException(
+        ErrorCode.EMAIL_NOT_VERIFIED,
+        'Please verify your email before logging in',
+      );
     }
 
     const token = await this.generateToken(user.userId, user.username);
@@ -193,7 +229,7 @@ export class AuthService {
     await this.redisService.set(
       redisKey,
       accessToken,
-      Number(this.configService.get<string>('JWT_TTL_SECONDS'))
+      Number(this.configService.get<string>('JWT_TTL_SECONDS')),
     );
 
     return accessToken;
@@ -209,5 +245,32 @@ export class AuthService {
 
   private getRedisTokenKey(userId: number, jti: string): string {
     return `auth:user:${userId}:token:${jti}`;
+  }
+
+  private createEmailVerifyToken(email: string, otp: string): string {
+    return Buffer.from(JSON.stringify({ email, otp })).toString('base64url');
+  }
+
+  private parseEmailVerifyToken(token: string): { email: string; otp: string } {
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(token, 'base64url').toString('utf8'),
+      ) as unknown;
+      if (
+        !parsed ||
+        typeof parsed !== 'object' ||
+        !('email' in parsed) ||
+        !('otp' in parsed)
+      ) {
+        throw new BadRequestException('Invalid verification token');
+      }
+      const { email, otp } = parsed;
+      if (typeof email !== 'string' || typeof otp !== 'string') {
+        throw new BadRequestException('Invalid verification token');
+      }
+      return { email, otp };
+    } catch {
+      throw new BadRequestException('Invalid verification token');
+    }
   }
 }

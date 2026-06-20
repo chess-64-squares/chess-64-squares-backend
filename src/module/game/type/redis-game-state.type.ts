@@ -1,5 +1,5 @@
-import { GameStatus } from "../../../common/enum/game-status.enum"; 
-import { ReasonForEnding } from "../../../common/enum/reason-for-ending.enum";
+import { GameStatus } from '../../../common/enum/game-status.enum';
+import { ReasonForEnding } from '../../../common/enum/reason-for-ending.enum';
 
 export type RedisGameState = {
   gameId: number;
