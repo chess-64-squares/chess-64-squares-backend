@@ -4,6 +4,7 @@ import { Game } from './game.entity';
 @Entity('moves')
 export class Move {
     @ManyToOne(() => Game, { nullable: false })
+    @JoinColumn({ name: 'game_id' })
     @PrimaryColumn({ name: 'game_id' })
     game: Game;
 
