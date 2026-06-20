@@ -13,7 +13,13 @@ export function createSocketAuthMiddleware(jwtService: JwtService) {
             }
 
             const payload = jwtService.verify(token); // điều chỉnh secret/options theo cấu hình hiện tại
-            (socket as any).data = { userId: payload.sub ?? payload.userId };
+            const userId = Number(payload.sub ?? payload.userId);
+
+            if (!Number.isInteger(userId)) {
+                return next(new Error('Token không hợp lệ'));
+            }
+
+            (socket as any).data = { userId };
 
             next();
         } catch (error) {

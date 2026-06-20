@@ -11,7 +11,7 @@ export class UserController {
     @Get('profile')
     @UseGuards(AuthGuard('jwt'))
     async getProfile(@Req() req: any): Promise<ApiResponse<UserResDto>> {
-        const userRes = await this.userService.getProfile(req.user.sub);
+        const userRes = await this.userService.getProfile(Number(req.user.sub));
         return ApiResponse.success(userRes);
     }
 

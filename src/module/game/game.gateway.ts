@@ -7,7 +7,7 @@ import {
     ConnectedSocket,
     MessageBody,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { Namespace, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 
 import { GameService } from './game.service';
@@ -28,7 +28,7 @@ interface AuthenticatedSocket extends Socket {
 })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
-    server: Server;
+    server: Namespace;
 
     private readonly logger = new Logger(GameGateway.name);
 
@@ -95,16 +95,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
             const whiteSocketId = this.userSocketMap.get(game.playerWhite.userId);
             const blackSocketId = this.userSocketMap.get(game.playerBlack.userId);
+            const whiteSocket = whiteSocketId ? this.server.sockets.get(whiteSocketId) : undefined;
+            const blackSocket = blackSocketId ? this.server.sockets.get(blackSocketId) : undefined;
 
-            if (whiteSocketId) {
-                this.server.sockets.sockets.get(whiteSocketId)?.join(room);
+            if (!whiteSocket || !blackSocket) {
+                this.logger.warn(
+                    `Match ${game.gameId} created but a player socket is missing. white=${whiteSocketId ?? 'none'}, black=${blackSocketId ?? 'none'}`,
+                );
             }
-            if (blackSocketId) {
-                this.server.sockets.sockets.get(blackSocketId)?.join(room);
+
+            if (whiteSocket) {
+                await whiteSocket.join(room);
+            }
+            if (blackSocket) {
+                await blackSocket.join(room);
             }
 
             // Gửi thông tin trận đấu cho cả 2 người chơi (mỗi người biết mình cầm quân gì)
-            this.server.to(room).emit('matchFound', {
+            const payload = {
                 gameId: game.gameId,
                 fen: game.fen,
                 playerWhite: {
@@ -115,10 +123,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
                     userId: game.playerBlack.userId,
                     username: game.playerBlack.username,
                 },
+                gameMode: game.gameMode,
                 status: game.status,
-            });
+                reasonForEnding: game.reasonForEnding,
+                date: game.date,
+            };
+
+            whiteSocket?.emit('matchFound', payload);
+            blackSocket?.emit('matchFound', payload);
         } catch (error) {
-            client.emit('error', { message: 'Đã xảy ra lỗi khi tìm trận' });
+            const message = error instanceof Error ? error.message : 'Đã xảy ra lỗi khi tìm trận';
+            this.logger.error(`Find match failed for user ${userId}: ${message}`, error instanceof Error ? error.stack : undefined);
+            client.emit('error', { message });
         }
     }
 
@@ -159,7 +175,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             });
 
             // Nếu ván kết thúc -> thông báo riêng
-            if (result.game.status in [GameStatus.WHITE_WINS, GameStatus.BLACK_WINS, GameStatus.DRAW, GameStatus.ABORTED]) {
+            if ([GameStatus.WHITE_WINS, GameStatus.BLACK_WINS, GameStatus.DRAW, GameStatus.ABORTED].includes(result.game.status)) {
                 this.server.to(room).emit('gameOver', {
                     gameId: result.game.gameId,
                     reasonForEnding: result.game.reasonForEnding,
@@ -168,7 +184,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             }
         } catch (error) {
             // Chỉ báo lỗi cho người gửi nước đi sai
-            client.emit('moveError', { message: 'Đã xảy ra lỗi khi thực hiện nước đi' });
+            const message = error instanceof Error ? error.message : 'Đã xảy ra lỗi khi thực hiện nước đi';
+            this.logger.error(`Make move failed for user ${userId}: ${message}`, error instanceof Error ? error.stack : undefined);
+            client.emit('moveError', { message });
         }
     }
 
@@ -194,7 +212,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 status: game.status,
             });
         } catch (error) {
-            client.emit('error', { message: 'Đã xảy ra lỗi khi đầu hàng' });
+            const message = error instanceof Error ? error.message : 'Đã xảy ra lỗi khi đầu hàng';
+            this.logger.error(`Resign failed for user ${userId}: ${message}`, error instanceof Error ? error.stack : undefined);
+            client.emit('error', { message });
         }
     }
 
@@ -239,7 +259,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 },
             });
         } catch (error) {
-            client.emit('error', { message: 'Đã xảy ra lỗi khi tìm trận' });
+            const message = error instanceof Error ? error.message : 'Đã xảy ra lỗi khi tìm trận';
+            this.logger.error(`Join game failed for user ${userId}: ${message}`, error instanceof Error ? error.stack : undefined);
+            client.emit('error', { message });
         }
     }
 }

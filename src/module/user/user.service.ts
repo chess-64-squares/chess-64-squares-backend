@@ -6,14 +6,12 @@ import { User } from './user.entity';
 import { ApiResponse } from '../../common/response/api-response';
 import { UserResDto } from './dto';
 import { AppException, ErrorCode } from '../../common/exceptions';
-import { GameService } from '../game/game.service';
 
 @Injectable()
 export class UserService {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
-        private readonly gameService: GameService,
     ) { }
 
     async findByEmail(email: string): Promise<User | null> {

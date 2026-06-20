@@ -1,11 +1,20 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { GameService } from "./game.service";
+import { GameModeService } from "./game-mode.service";
 import { ApiResponse } from "../../common/response/api-response";
-import { GameResDto } from "./dto";
+import { GameModeResDto, GameResDto } from "./dto";
 
 @Controller('game')
 export class GameController {
-    constructor(private readonly gameService: GameService) { }
+    constructor(
+        private readonly gameService: GameService,
+        private readonly gameModeService: GameModeService,
+    ) { }
+
+    @Get('modes')
+    async getGameModes(): Promise<ApiResponse<GameModeResDto[]>> {
+        return ApiResponse.success(await this.gameModeService.findAll());
+    }
 
     @Get('user/:userId')
     async getGamesByUserId(@Param('userId') userId: string): Promise<ApiResponse<GameResDto[]>> {

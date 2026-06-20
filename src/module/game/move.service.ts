@@ -11,6 +11,7 @@ export class MoveService {
     constructor(
         @InjectRepository(Move)
         private readonly moveRepository: Repository<Move>,
+        @InjectRepository(Game)
         private readonly gameRepository: Repository<Game>,
 
     ) { }

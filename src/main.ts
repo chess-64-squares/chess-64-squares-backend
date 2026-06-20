@@ -30,6 +30,10 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     app.setGlobalPrefix(process.env.API_PREFIX || 'api/v1');
+    app.enableCors({
+        origin: true,
+        credentials: true,
+    });
 
     const jwtService = app.get(JwtService);
     app.useWebSocketAdapter(new AuthenticatedIoAdapter(app, jwtService));

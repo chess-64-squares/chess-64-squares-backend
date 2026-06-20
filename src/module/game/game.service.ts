@@ -23,7 +23,6 @@ export class GameService {
     constructor(
         @InjectRepository(Game)
         private readonly gameRepository: Repository<Game>,
-
         private readonly moveService: MoveService,
         private readonly userService: UserService,
         private readonly gameModeService: GameModeService
@@ -56,6 +55,7 @@ export class GameService {
             playerWhite,
             playerBlack,
             gameMode,
+            status: GameStatus.IN_PROGRESS,
         });
 
         const savedGame = await this.gameRepository.save(newGame);
