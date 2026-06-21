@@ -34,11 +34,19 @@ export class Game {
   @Column({ name: 'player_black_elo', type: 'int', default: 800 })
   playerBlackElo: number;
 
-  @Column({ name: 'player_white_elo_change', type: 'int', default: 0 })
-  playerWhiteEloChange: number;
+  @Column({ name: 'player_white_time_ms', type: 'int', default: 0 })
+  playerWhiteTimeMs: number;
 
-  @Column({ name: 'player_black_elo_change', type: 'int', default: 0 })
-  playerBlackEloChange: number;
+  @Column({ name: 'player_black_time_ms', type: 'int', default: 0 })
+  playerBlackTimeMs: number;
+
+  @Column({
+    name: 'last_move_at',
+    type: 'timestamp',
+    nullable: true,
+    default: null,
+  })
+  lastMoveAt: Date | null;
 
   @Column({
     name: 'fen',

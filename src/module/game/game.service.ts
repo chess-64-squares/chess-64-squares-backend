@@ -38,7 +38,7 @@ export class GameService {
     private readonly moveService: MoveService,
     private readonly userService: UserService,
     private readonly gameModeService: GameModeService,
-  ) {}
+  ) { }
 
   async create(
     playerWhiteId: number,
@@ -85,6 +85,9 @@ export class GameService {
       gameMode,
       playerWhiteElo: playerWhite.elo,
       playerBlackElo: playerBlack.elo,
+      playerWhiteTimeMs: gameMode.time * 60 * 1000,
+      playerBlackTimeMs: gameMode.time * 60 * 1000,
+      lastMoveAt: new Date(),
       status: GameStatus.IN_PROGRESS,
     });
 
@@ -96,8 +99,9 @@ export class GameService {
       gameMode: savedGame.gameMode,
       playerWhiteElo: savedGame.playerWhiteElo,
       playerBlackElo: savedGame.playerBlackElo,
-      playerWhiteEloChange: savedGame.playerWhiteEloChange,
-      playerBlackEloChange: savedGame.playerBlackEloChange,
+      playerWhiteTimeMs: savedGame.playerWhiteTimeMs,
+      playerBlackTimeMs: savedGame.playerBlackTimeMs,
+      lastMoveAt: savedGame.lastMoveAt,
       fen: savedGame.fen,
       status: savedGame.status,
       reasonForEnding: savedGame.reasonForEnding,
@@ -201,6 +205,11 @@ export class GameService {
     const isWhite = game.playerWhite.userId === userId;
 
     const chess = new Chess(game.fen);
+    const timedOut = await this.applyClockBeforeMove(game, isWhite);
+    if (timedOut) {
+      await this.gameRepository.save(game);
+      return { game, san: 'timeout' };
+    }
 
     // Kiểm tra đúng lượt
     const turn = chess.turn(); // 'w' hoặc 'b'
@@ -226,6 +235,7 @@ export class GameService {
 
     // Cập nhật FEN mới vào game
     game.fen = chess.fen();
+    this.applyIncrementAfterMove(game, isWhite);
 
     // Lưu lịch sử nước đi
     const moveCount = await this.moveService.count(safeGameId, isWhite);
@@ -271,6 +281,36 @@ export class GameService {
     await this.gameRepository.save(game);
 
     return { game, san: moveResult.san };
+  }
+
+  async flagTimeout(userId: number, gameId: unknown): Promise<GameResDto> {
+    const game = await this.getGameById(gameId);
+
+    if (game.status !== GameStatus.IN_PROGRESS) {
+      throw new AppException(
+        ErrorCode.GAME_NOT_IN_PROGRESS,
+        'Game not in progress',
+      );
+    }
+
+    if (
+      game.playerWhite.userId !== userId &&
+      game.playerBlack.userId !== userId
+    ) {
+      throw new AppException(
+        ErrorCode.USER_NOT_IN_GAME,
+        'You are not a player in this game',
+      );
+    }
+
+    const turn = new Chess(game.fen).turn();
+    const timedOut = await this.applyClockBeforeMove(game, turn === 'w');
+    if (!timedOut) {
+      throw new AppException(ErrorCode.INVALID_MOVE, 'No player has timed out');
+    }
+
+    await this.gameRepository.save(game);
+    return game;
   }
 
   async resign(userId: number, gameId: unknown): Promise<GameResDto> {
@@ -501,11 +541,50 @@ export class GameService {
 
     game.playerWhite.elo = nextWhiteElo;
     game.playerBlack.elo = nextBlackElo;
-    game.playerWhiteEloChange = nextWhiteElo - whiteElo;
-    game.playerBlackEloChange = nextBlackElo - blackElo;
 
     await this.userService.updateElo(game.playerWhite.userId, nextWhiteElo);
     await this.userService.updateElo(game.playerBlack.userId, nextBlackElo);
+  }
+
+  private async applyClockBeforeMove(
+    game: GameResDto,
+    isWhiteTurn: boolean,
+  ): Promise<boolean> {
+    if (!game.lastMoveAt) {
+      game.lastMoveAt = new Date();
+      return false;
+    }
+
+    const elapsedMs = Math.max(0, Date.now() - new Date(game.lastMoveAt).getTime());
+    if (isWhiteTurn) {
+      game.playerWhiteTimeMs = Math.max(0, game.playerWhiteTimeMs - elapsedMs);
+      if (game.playerWhiteTimeMs === 0) {
+        game.status = GameStatus.BLACK_WINS;
+        game.reasonForEnding = ReasonForEnding.TIMEOUT;
+        await this.applyElo(game);
+        return true;
+      }
+    } else {
+      game.playerBlackTimeMs = Math.max(0, game.playerBlackTimeMs - elapsedMs);
+      if (game.playerBlackTimeMs === 0) {
+        game.status = GameStatus.WHITE_WINS;
+        game.reasonForEnding = ReasonForEnding.TIMEOUT;
+        await this.applyElo(game);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private applyIncrementAfterMove(game: GameResDto, isWhiteTurn: boolean): void {
+    const incrementMs = (game.gameMode?.plusPerMove ?? 0) * 1000;
+    if (isWhiteTurn) {
+      game.playerWhiteTimeMs += incrementMs;
+    } else {
+      game.playerBlackTimeMs += incrementMs;
+    }
+    game.lastMoveAt = new Date();
   }
 
   private getKFactor(elo: number): number {

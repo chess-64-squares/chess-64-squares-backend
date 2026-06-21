@@ -22,6 +22,18 @@ interface AuthenticatedSocket extends Socket {
 
 type OfferType = 'draw' | 'resign';
 
+function clockPayload(game: {
+  playerWhiteTimeMs: number;
+  playerBlackTimeMs: number;
+  lastMoveAt: Date | null;
+}) {
+  return {
+    playerWhiteTimeMs: game.playerWhiteTimeMs,
+    playerBlackTimeMs: game.playerBlackTimeMs,
+    lastMoveAt: game.lastMoveAt,
+  };
+}
+
 @WebSocketGateway({
   cors: {
     origin: '*', // thay bằng domain frontend thực tế khi deploy
@@ -41,7 +53,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     { gameId: number; fromUserId: number; toUserId: number; type: OfferType }
   > = new Map();
 
-  constructor(private readonly gameService: GameService) {}
+  constructor(private readonly gameService: GameService) { }
 
   handleConnection(client: AuthenticatedSocket) {
     // userId nên được gán từ middleware xác thực JWT (xem ghi chú bên dưới)
@@ -140,8 +152,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameMode: game.gameMode,
         playerWhiteElo: game.playerWhiteElo,
         playerBlackElo: game.playerBlackElo,
-        playerWhiteEloChange: game.playerWhiteEloChange,
-        playerBlackEloChange: game.playerBlackEloChange,
+        ...clockPayload(game),
         status: game.status,
         reasonForEnding: game.reasonForEnding,
         date: game.date,
@@ -187,15 +198,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const result = await this.gameService.makeMove(userId, dto);
       const room = `game_${result.game.gameId}`;
 
-      // Gửi nước đi mới cho cả 2 người chơi trong room
-      this.server.to(room).emit('moveMade', {
-        gameId: result.game.gameId,
-        from: dto.from,
-        to: dto.to,
-        san: result.san,
-        fen: result.game.fen,
-        moveCount: await this.gameService.getMoveCount(result.game.gameId),
-      });
+      if (result.san !== 'timeout') {
+        // Gửi nước đi mới cho cả 2 người chơi trong room
+        this.server.to(room).emit('moveMade', {
+          gameId: result.game.gameId,
+          from: dto.from,
+          to: dto.to,
+          san: result.san,
+          fen: result.game.fen,
+          ...clockPayload(result.game),
+          moveCount: await this.gameService.getMoveCount(result.game.gameId),
+        });
+      }
 
       // Nếu ván kết thúc -> thông báo riêng
       if (
@@ -210,8 +224,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           gameId: result.game.gameId,
           reasonForEnding: result.game.reasonForEnding,
           status: result.game.status,
-          playerWhiteEloChange: result.game.playerWhiteEloChange,
-          playerBlackEloChange: result.game.playerBlackEloChange,
+          ...clockPayload(result.game),
         });
       }
     } catch (error) {
@@ -248,8 +261,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameId: game.gameId,
         reasonForEnding: game.reasonForEnding,
         status: game.status,
-        playerWhiteEloChange: game.playerWhiteEloChange,
-        playerBlackEloChange: game.playerBlackEloChange,
+        ...clockPayload(game),
       });
     } catch (error) {
       const message =
@@ -364,8 +376,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         status: game.status,
         playerWhite: game.playerWhite,
         playerBlack: game.playerBlack,
-        playerWhiteEloChange: game.playerWhiteEloChange,
-        playerBlackEloChange: game.playerBlackEloChange,
+        ...clockPayload(game),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Request failed';
@@ -392,8 +403,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameId: game.gameId,
         reasonForEnding: game.reasonForEnding,
         status: game.status,
-        playerWhiteEloChange: game.playerWhiteEloChange,
-        playerBlackEloChange: game.playerBlackEloChange,
+        ...clockPayload(game),
       });
     } catch (error) {
       const message =
@@ -453,8 +463,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameMode: game.gameMode,
         playerWhiteElo: game.playerWhiteElo,
         playerBlackElo: game.playerBlackElo,
-        playerWhiteEloChange: game.playerWhiteEloChange,
-        playerBlackEloChange: game.playerBlackEloChange,
+        ...clockPayload(game),
         reasonForEnding: game.reasonForEnding,
       });
     } catch (error) {
@@ -464,6 +473,29 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         `Join game failed for user ${userId}: ${message}`,
         error instanceof Error ? error.stack : undefined,
       );
+      client.emit('error', { message });
+    }
+  }
+
+  @SubscribeMessage('flagTimeout')
+  async handleFlagTimeout(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { gameId: number },
+  ) {
+    const userId = client.data.userId;
+    const room = `game_${data.gameId}`;
+
+    try {
+      const game = await this.gameService.flagTimeout(userId, data.gameId);
+      this.server.to(room).emit('gameOver', {
+        gameId: game.gameId,
+        reasonForEnding: game.reasonForEnding,
+        status: game.status,
+        ...clockPayload(game),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Timeout check failed';
       client.emit('error', { message });
     }
   }
