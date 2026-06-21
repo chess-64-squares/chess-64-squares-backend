@@ -468,6 +468,19 @@ export class GameService {
     return { ...game, moves };
   }
 
+  async getActiveGameByUserId(userId: number): Promise<GameResDto | null> {
+    return this.gameRepository.findOne({
+      where: [
+        { playerWhite: { userId }, status: GameStatus.IN_PROGRESS },
+        { playerBlack: { userId }, status: GameStatus.IN_PROGRESS },
+      ],
+      relations: ['playerWhite', 'playerBlack', 'gameMode'],
+      order: {
+        date: 'DESC',
+      },
+    });
+  }
+
   async getGamesByUserId(
     userId: number,
     page = 1,

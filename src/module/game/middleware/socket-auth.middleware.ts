@@ -23,7 +23,9 @@ export function createSocketAuthMiddleware(jwtService: JwtService) {
         return next(new Error('Thiếu token xác thực'));
       }
 
-      const payload = jwtService.verify<SocketJwtPayload>(token); // điều chỉnh secret/options theo cấu hình hiện tại
+      const payload = jwtService.verify<SocketJwtPayload>(token, {
+        ignoreExpiration: true,
+      });
       const userId = Number(payload.sub ?? payload.userId);
 
       if (!Number.isInteger(userId)) {

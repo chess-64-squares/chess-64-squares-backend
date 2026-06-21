@@ -226,11 +226,7 @@ export class AuthService {
 
     const redisKey = this.getRedisTokenKey(userId, jti);
 
-    await this.redisService.set(
-      redisKey,
-      accessToken,
-      Number(this.configService.get<string>('JWT_TTL_SECONDS')),
-    );
+    await this.redisService.set(redisKey, accessToken);
 
     return accessToken;
   }

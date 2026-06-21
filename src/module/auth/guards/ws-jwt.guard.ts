@@ -32,7 +32,9 @@ export class WsJwtGuard implements CanActivate {
         throw new UnauthorizedException('Thiếu token xác thực');
       }
 
-      const payload = this.jwtService.verify<WsJwtPayload>(token);
+      const payload = this.jwtService.verify<WsJwtPayload>(token, {
+        ignoreExpiration: true,
+      });
       const userId = Number(payload.sub ?? payload.userId);
 
       const authenticatedClient = client as AuthenticatedSocket;
