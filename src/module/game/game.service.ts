@@ -96,6 +96,8 @@ export class GameService {
       gameMode: savedGame.gameMode,
       playerWhiteElo: savedGame.playerWhiteElo,
       playerBlackElo: savedGame.playerBlackElo,
+      playerWhiteEloChange: savedGame.playerWhiteEloChange,
+      playerBlackEloChange: savedGame.playerBlackEloChange,
       fen: savedGame.fen,
       status: savedGame.status,
       reasonForEnding: savedGame.reasonForEnding,
@@ -499,6 +501,8 @@ export class GameService {
 
     game.playerWhite.elo = nextWhiteElo;
     game.playerBlack.elo = nextBlackElo;
+    game.playerWhiteEloChange = nextWhiteElo - whiteElo;
+    game.playerBlackEloChange = nextBlackElo - blackElo;
 
     await this.userService.updateElo(game.playerWhite.userId, nextWhiteElo);
     await this.userService.updateElo(game.playerBlack.userId, nextBlackElo);

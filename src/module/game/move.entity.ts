@@ -7,6 +7,9 @@ export class Move {
   @JoinColumn({ name: 'game_id' })
   game: Game;
 
+  @PrimaryColumn({ name: 'game_id', type: 'int' })
+  gameId: number;
+
   @PrimaryColumn({ name: 'move_number', type: 'int' })
   moveNumber: number;
 

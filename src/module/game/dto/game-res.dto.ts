@@ -10,6 +10,8 @@ export class GameResDto {
   gameMode: GameModeResDto;
   playerWhiteElo: number;
   playerBlackElo: number;
+  playerWhiteEloChange: number;
+  playerBlackEloChange: number;
   fen: string;
   status: GameStatus;
   reasonForEnding: ReasonForEnding | null;

@@ -34,6 +34,12 @@ export class Game {
   @Column({ name: 'player_black_elo', type: 'int', default: 800 })
   playerBlackElo: number;
 
+  @Column({ name: 'player_white_elo_change', type: 'int', default: 0 })
+  playerWhiteEloChange: number;
+
+  @Column({ name: 'player_black_elo_change', type: 'int', default: 0 })
+  playerBlackEloChange: number;
+
   @Column({
     name: 'fen',
     default: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',

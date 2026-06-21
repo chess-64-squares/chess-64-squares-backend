@@ -140,6 +140,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameMode: game.gameMode,
         playerWhiteElo: game.playerWhiteElo,
         playerBlackElo: game.playerBlackElo,
+        playerWhiteEloChange: game.playerWhiteEloChange,
+        playerBlackEloChange: game.playerBlackEloChange,
         status: game.status,
         reasonForEnding: game.reasonForEnding,
         date: game.date,
@@ -208,6 +210,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           gameId: result.game.gameId,
           reasonForEnding: result.game.reasonForEnding,
           status: result.game.status,
+          playerWhiteEloChange: result.game.playerWhiteEloChange,
+          playerBlackEloChange: result.game.playerBlackEloChange,
         });
       }
     } catch (error) {
@@ -244,6 +248,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameId: game.gameId,
         reasonForEnding: game.reasonForEnding,
         status: game.status,
+        playerWhiteEloChange: game.playerWhiteEloChange,
+        playerBlackEloChange: game.playerBlackEloChange,
       });
     } catch (error) {
       const message =
@@ -358,6 +364,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         status: game.status,
         playerWhite: game.playerWhite,
         playerBlack: game.playerBlack,
+        playerWhiteEloChange: game.playerWhiteEloChange,
+        playerBlackEloChange: game.playerBlackEloChange,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Request failed';
@@ -384,6 +392,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameId: game.gameId,
         reasonForEnding: game.reasonForEnding,
         status: game.status,
+        playerWhiteEloChange: game.playerWhiteEloChange,
+        playerBlackEloChange: game.playerBlackEloChange,
       });
     } catch (error) {
       const message =
@@ -443,6 +453,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameMode: game.gameMode,
         playerWhiteElo: game.playerWhiteElo,
         playerBlackElo: game.playerBlackElo,
+        playerWhiteEloChange: game.playerWhiteEloChange,
+        playerBlackEloChange: game.playerBlackEloChange,
         reasonForEnding: game.reasonForEnding,
       });
     } catch (error) {
