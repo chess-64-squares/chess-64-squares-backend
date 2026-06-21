@@ -48,11 +48,6 @@ export class GameController {
     );
   }
 
-  @Get(':gameId')
-  async getGameDetail(@Param('gameId') gameId: string) {
-    return ApiResponse.success(await this.gameService.getGameDetail(gameId));
-  }
-
   @Get('username/:username')
   async getGamesByUsername(
     @Param('username') username: string,
@@ -60,5 +55,10 @@ export class GameController {
     return ApiResponse.success(
       await this.gameService.getGamesByUsername(username),
     );
+  }
+
+  @Get(':gameId')
+  async getGameDetail(@Param('gameId') gameId: string) {
+    return ApiResponse.success(await this.gameService.getGameDetail(gameId));
   }
 }
