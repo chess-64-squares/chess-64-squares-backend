@@ -224,6 +224,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           gameId: result.game.gameId,
           reasonForEnding: result.game.reasonForEnding,
           status: result.game.status,
+          playerWhite: result.game.playerWhite,
+          playerBlack: result.game.playerBlack,
           ...clockPayload(result.game),
         });
       }
@@ -261,6 +263,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameId: game.gameId,
         reasonForEnding: game.reasonForEnding,
         status: game.status,
+        playerWhite: game.playerWhite,
+        playerBlack: game.playerBlack,
         ...clockPayload(game),
       });
     } catch (error) {
@@ -403,6 +407,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameId: game.gameId,
         reasonForEnding: game.reasonForEnding,
         status: game.status,
+        playerWhite: game.playerWhite,
+        playerBlack: game.playerBlack,
         ...clockPayload(game),
       });
     } catch (error) {
@@ -491,6 +497,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         gameId: game.gameId,
         reasonForEnding: game.reasonForEnding,
         status: game.status,
+        playerWhite: game.playerWhite,
+        playerBlack: game.playerBlack,
         ...clockPayload(game),
       });
     } catch (error) {

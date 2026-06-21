@@ -205,8 +205,8 @@ export class GameService {
     const isWhite = game.playerWhite.userId === userId;
 
     const chess = new Chess(game.fen);
-    const timedOut = await this.applyClockBeforeMove(game, isWhite);
-    if (timedOut) {
+    const clockResult = await this.applyClockBeforeMove(game, isWhite);
+    if (clockResult.timedOut) {
       await this.gameRepository.save(game);
       return { game, san: 'timeout' };
     }
@@ -246,7 +246,7 @@ export class GameService {
       moveNumber: moveCount + 1,
       san: moveResult.san,
       fen: chess.fen(),
-      timeTaken: 0,
+      timeTaken: clockResult.elapsedMs,
     });
 
     if (chess.isGameOver()) {
@@ -304,8 +304,8 @@ export class GameService {
     }
 
     const turn = new Chess(game.fen).turn();
-    const timedOut = await this.applyClockBeforeMove(game, turn === 'w');
-    if (!timedOut) {
+    const clockResult = await this.applyClockBeforeMove(game, turn === 'w');
+    if (!clockResult.timedOut) {
       throw new AppException(ErrorCode.INVALID_MOVE, 'No player has timed out');
     }
 
@@ -549,10 +549,10 @@ export class GameService {
   private async applyClockBeforeMove(
     game: GameResDto,
     isWhiteTurn: boolean,
-  ): Promise<boolean> {
+  ): Promise<{ timedOut: boolean; elapsedMs: number }> {
     if (!game.lastMoveAt) {
       game.lastMoveAt = new Date();
-      return false;
+      return { timedOut: false, elapsedMs: 0 };
     }
 
     const elapsedMs = Math.max(0, Date.now() - new Date(game.lastMoveAt).getTime());
@@ -562,7 +562,7 @@ export class GameService {
         game.status = GameStatus.BLACK_WINS;
         game.reasonForEnding = ReasonForEnding.TIMEOUT;
         await this.applyElo(game);
-        return true;
+        return { timedOut: true, elapsedMs };
       }
     } else {
       game.playerBlackTimeMs = Math.max(0, game.playerBlackTimeMs - elapsedMs);
@@ -570,11 +570,11 @@ export class GameService {
         game.status = GameStatus.WHITE_WINS;
         game.reasonForEnding = ReasonForEnding.TIMEOUT;
         await this.applyElo(game);
-        return true;
+        return { timedOut: true, elapsedMs };
       }
     }
 
-    return false;
+    return { timedOut: false, elapsedMs };
   }
 
   private applyIncrementAfterMove(game: GameResDto, isWhiteTurn: boolean): void {
