@@ -4,7 +4,7 @@ import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) { }
 
   private createTransporter() {
     return nodemailer.createTransport({
@@ -19,8 +19,7 @@ export class MailService {
   }
 
   async sendVerifyEmail(email: string, token: string) {
-    const appUrl =
-      this.configService.get<string>('WEB_URL') ?? 'https://localhost:5173';
+    const appUrl = this.configService.get<string>('WEB_URL');
 
     const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(token)}`;
 

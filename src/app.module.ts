@@ -7,18 +7,21 @@ import { UserModule } from './module/user/user.module';
 import { ConfigModule } from '@nestjs/config';
 import { MailModule } from './module/mail/mail.module';
 import { GameModule } from './module/game/game.module';
+import * as fs from 'fs';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env.local',
+      isGlobal: true
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL,
       autoLoadEntities: true,
       synchronize: true,
+      ssl: {
+        ca: fs.readFileSync('global-bundle.pem').toString(),
+      },
     }),
     AuthModule,
     MailModule,
@@ -28,4 +31,4 @@ import { GameModule } from './module/game/game.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
