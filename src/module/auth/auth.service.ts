@@ -28,7 +28,7 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async register(registerReqDto: RegisterReqDto): Promise<void> {
     const existingUser = await this.userService.findByEmail(
