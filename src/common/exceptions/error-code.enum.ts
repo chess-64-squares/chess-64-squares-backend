@@ -17,4 +17,8 @@ export enum ErrorCode {
   USER_NOT_IN_GAME = '02005',
   GAME_NOT_IN_PROGRESS = '02006',
   NOT_YOUR_TURN = '02007',
+
+  CHAT_NOT_ALLOWED = '03001',
+
+  PUZZLE_NOT_FOUND = '05001',
 }

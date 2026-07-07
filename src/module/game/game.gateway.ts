@@ -11,7 +11,8 @@ import { Namespace, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 
 import { GameService } from './game.service';
-import { FindMatchReqDto, MakeMoveReqDto } from './dto';
+import { ChatService } from './chat.service';
+import { FindMatchReqDto, MakeMoveReqDto, SendChatMessageReqDto } from './dto';
 import { GameStatus } from '../../common/enum/game-status.enum';
 
 interface AuthenticatedSocket extends Socket {
@@ -53,7 +54,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     { gameId: number; fromUserId: number; toUserId: number; type: OfferType }
   > = new Map();
 
-  constructor(private readonly gameService: GameService) { }
+  constructor(
+    private readonly gameService: GameService,
+    private readonly chatService: ChatService,
+  ) { }
 
   handleConnection(client: AuthenticatedSocket) {
     // userId nên được gán từ middleware xác thực JWT (xem ghi chú bên dưới)
@@ -504,6 +508,65 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Timeout check failed';
+      client.emit('error', { message });
+    }
+  }
+
+  /**
+   * Client gửi tin nhắn chat trong 1 ván đấu.
+   * event: 'sendChatMessage'
+   * payload: { gameId: number, message: string }
+   */
+  @SubscribeMessage('sendChatMessage')
+  async handleSendChatMessage(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() dto: SendChatMessageReqDto,
+  ) {
+    const userId = client.data.userId;
+
+    try {
+      const game = await this.gameService.getGameById(dto.gameId);
+
+      const isPlayer =
+        game.playerWhite.userId === userId ||
+        game.playerBlack.userId === userId;
+
+      if (!isPlayer) {
+        client.emit('error', {
+          message: 'You are not a player in this game',
+        });
+        return;
+      }
+
+      const sender =
+        game.playerWhite.userId === userId
+          ? game.playerWhite
+          : game.playerBlack;
+
+      const chatMessage = await this.chatService.create(
+        dto.gameId,
+        userId,
+        dto.message,
+      );
+
+      const room = `game_${dto.gameId}`;
+      this.server.to(room).emit('chatMessage', {
+        id: chatMessage.id,
+        gameId: dto.gameId,
+        senderId: userId,
+        senderUsername: sender.username,
+        message: chatMessage.message,
+        createdAt: chatMessage.createdAt,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Đã xảy ra lỗi khi gửi tin nhắn';
+      this.logger.error(
+        `Send chat message failed for user ${userId}: ${message}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       client.emit('error', { message });
     }
   }

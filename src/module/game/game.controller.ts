@@ -1,8 +1,9 @@
 import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { GameService } from './game.service';
 import { GameModeService } from './game-mode.service';
+import { ChatService } from './chat.service';
 import { ApiResponse } from '../../common/response/api-response';
-import { GameModeResDto, GameResDto } from './dto';
+import { ChatMessageResDto, GameModeResDto, GameResDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 type AuthenticatedRequest = {
@@ -16,6 +17,7 @@ export class GameController {
   constructor(
     private readonly gameService: GameService,
     private readonly gameModeService: GameModeService,
+    private readonly chatService: ChatService,
   ) {}
 
   @Get('modes')
@@ -60,5 +62,36 @@ export class GameController {
   @Get(':gameId')
   async getGameDetail(@Param('gameId') gameId: string) {
     return ApiResponse.success(await this.gameService.getGameDetail(gameId));
+  }
+
+  @Get(':gameId/chat')
+  @UseGuards(JwtAuthGuard)
+  async getChatHistory(
+    @Param('gameId') gameId: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ApiResponse<ChatMessageResDto[]>> {
+    const game = await this.gameService.getGameById(gameId);
+    const userId = Number(req.user.sub);
+
+    if (game.playerWhite.userId !== userId && game.playerBlack.userId !== userId) {
+      return ApiResponse.success([]);
+    }
+
+    const messages = await this.chatService.findByGameId(gameId);
+    const usernameById = new Map<number, string>([
+      [game.playerWhite.userId, game.playerWhite.username],
+      [game.playerBlack.userId, game.playerBlack.username],
+    ]);
+
+    return ApiResponse.success(
+      messages.map((message) => ({
+        id: message.id,
+        gameId: message.gameId,
+        senderId: message.senderId,
+        senderUsername: usernameById.get(message.senderId) ?? 'Unknown',
+        message: message.message,
+        createdAt: message.createdAt,
+      })),
+    );
   }
 }

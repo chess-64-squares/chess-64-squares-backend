@@ -7,6 +7,7 @@ import { UserModule } from './module/user/user.module';
 import { ConfigModule } from '@nestjs/config';
 import { MailModule } from './module/mail/mail.module';
 import { GameModule } from './module/game/game.module';
+import { PuzzleModule } from './module/puzzle/puzzle.module';
 import * as fs from 'fs';
 
 @Module({
@@ -19,14 +20,15 @@ import * as fs from 'fs';
       url: process.env.DATABASE_URL,
       autoLoadEntities: true,
       synchronize: true,
-      ssl: {
-        ca: fs.readFileSync('global-bundle.pem').toString(),
-      },
+      // ssl: {
+      //   ca: fs.readFileSync('global-bundle.pem').toString(),
+      // },
     }),
     AuthModule,
     MailModule,
     UserModule,
     GameModule,
+    PuzzleModule,
   ],
   controllers: [AppController],
   providers: [AppService],

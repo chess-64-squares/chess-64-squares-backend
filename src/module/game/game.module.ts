@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Game } from './game.entity';
 import { Move } from './move.entity';
 import { GameMode } from './game-mode.entity';
+import { ChatMessage } from './chat-message.entity';
 
 import { User } from '../user/user.entity';
 import { UserService } from '../user/user.service';
@@ -14,14 +15,18 @@ import { GameGateway } from './game.gateway';
 import { GameController } from './game.controller';
 import { MoveService } from './move.service';
 import { GameModeService } from './game-mode.service';
+import { ChatService } from './chat.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Game, Move, GameMode, User])],
+  imports: [
+    TypeOrmModule.forFeature([Game, Move, GameMode, ChatMessage, User]),
+  ],
   providers: [
     GameService,
     GameGateway,
     MoveService,
     GameModeService,
+    ChatService,
     UserService,
   ],
   controllers: [GameController],
