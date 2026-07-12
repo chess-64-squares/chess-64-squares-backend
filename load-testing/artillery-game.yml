@@ -1,0 +1,44 @@
+# Load test: WebSocket gameplay path (Socket.IO engine).
+#   npx artillery run load/artillery-game.yml --target http://localhost:3000
+# See LOAD_TESTING.md for the full plan, phases and pass criteria.
+config:
+  target: "http://localhost:3000"
+  engines:
+    socketio-v3: {}
+  processor: "./processor.cjs"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 25
+      name: warm-up
+    - duration: 180
+      arrivalRate: 25
+      name: sustained
+    - duration: 60
+      arrivalRate: 25
+      rampTo: 60
+      name: spike
+  socketio:
+    transports: ["websocket"]
+
+scenarios:
+  # Each virtual user: register as guest over REST, connect /matchmaking with
+  # the JWT, queue for 1+0, and (if matched) idle in the game room to hold the
+  # connection — measuring connect handshake, queue latency and fan-out.
+  - name: guest-queue-and-hold
+    engine: socketio-v3
+    flow:
+      - function: "createGuestSession"     # sets ctx.vars.token
+      - namespace: "/matchmaking"
+        # socket.io auth payload from the processor-provided token
+        connect:
+          auth:
+            token: "{{ token }}"
+      - emit:
+          channel: "matchmaking:joinQueue"
+          data:
+            timeControlId: "1+0"
+      - think: 30
+      - emit:
+          channel: "matchmaking:leaveQueue"
+      - think: 5

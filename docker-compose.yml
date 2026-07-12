@@ -1,0 +1,105 @@
+# chess-64-squares — local development stack.
+# Run from THIS folder:  docker compose up -d postgres redis   (infra only)
+#                        docker compose up --build             (full stack)
+# Build contexts point at the PARENT directory, which contains the four
+# sibling project folders — no other files at that level are required.
+name: chess-64-squares
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-chess64}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chess64_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-chess64}
+    ports:
+      # host port is configurable — dev machines often run a native Postgres on 5432
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chess64} -d ${POSTGRES_DB:-chess64}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  chess-64-squares-backend:
+    image: chess-64-squares-backend:local
+    build:
+      context: ..
+      dockerfile: chess-64-squares-backend/Dockerfile
+    environment:
+      NODE_ENV: production
+      BACKEND_PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-chess64}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chess64_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-chess64}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-me}
+      CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      FRONTEND_BASE_URL: http://localhost:8080
+      RUN_MIGRATIONS: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  chess-64-squares-worker:
+    image: chess-64-squares-worker:local
+    build:
+      context: ..
+      dockerfile: chess-64-squares-worker/Dockerfile
+    environment:
+      NODE_ENV: production
+      WORKER_PORT: 3001
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-chess64}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chess64_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-chess64}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STOCKFISH_PATH: /usr/games/stockfish
+      STOCKFISH_POOL_SIZE: 2
+      ANALYSIS_DEPTH: 12
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  chess-64-squares-web:
+    image: chess-64-squares-web:local
+    build:
+      context: ..
+      dockerfile: chess-64-squares-web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+        VITE_WS_URL: http://localhost:3000
+    ports:
+      - "8080:80"
+    depends_on:
+      - chess-64-squares-backend
+
+volumes:
+  pgdata:

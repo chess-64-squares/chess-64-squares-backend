@@ -1,46 +1,47 @@
-import { INestApplication } from '@nestjs/common';
+import 'reflect-metadata';
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
-import { IoAdapter } from '@nestjs/platform-socket.io';
-import { Server, ServerOptions } from 'socket.io';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
 import { AppModule } from './app.module';
-import { createSocketAuthMiddleware } from './module/game/middleware/socket-auth.middleware';
+import { RedisIoAdapter } from './common/redis/redis-io.adapter';
+import type { AppConfig } from './config/configuration';
 
-class AuthenticatedIoAdapter extends IoAdapter {
-  constructor(
-    private readonly app: INestApplication,
-    private readonly jwtService: JwtService,
-  ) {
-    super(app);
-  }
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  app.useGlobalInterceptors(new LoggerErrorInterceptor());
 
-  createIOServer(port: number, options?: Partial<ServerOptions>): Server {
-    const server = super.createIOServer(port, {
-      ...options,
-      cors: {
-        origin: '*', // thay bằng domain frontend khi deploy
-      },
-    }) as Server;
+  const config = app.get(ConfigService<AppConfig, true>);
+  const corsOrigins = config.get('corsOrigins', { infer: true });
+  const redis = config.get('redis', { infer: true });
 
-    server.of('/game').use(createSocketAuthMiddleware(this.jwtService));
+  // security & parsing
+  app.use(helmet());
+  app.use(cookieParser());
+  app.enableCors({ origin: corsOrigins, credentials: true });
 
-    return server;
-  }
-}
+  // class-validator on every REST inbound payload
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: false },
+    }),
+  );
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Socket.IO over the Redis adapter — cross-instance broadcasts
+  const ioAdapter = new RedisIoAdapter(app, corsOrigins);
+  await ioAdapter.connectToRedis(redis.host, redis.port, redis.password);
+  app.useWebSocketAdapter(ioAdapter);
 
-  app.setGlobalPrefix(process.env.API_PREFIX || 'api/v1');
-  app.enableCors({
-    origin: true,
-    credentials: true,
-  });
+  app.enableShutdownHooks();
 
-  const jwtService = app.get(JwtService);
-  app.useWebSocketAdapter(new AuthenticatedIoAdapter(app, jwtService));
-
-  await app.listen(process.env.PORT ?? 3000);
+  const port = config.get('port', { infer: true });
+  await app.listen(port);
+  app.get(Logger).log(`chess-64-squares-backend listening on :${port}`);
 }
 
 void bootstrap();
